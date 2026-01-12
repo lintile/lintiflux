@@ -435,7 +435,7 @@ var migrations = [...]func(tx *sql.Tx) error{
 
 		hasExtra := false
 		if err := tx.QueryRow(`
-			SELECT true 
+			SELECT true
 			FROM information_schema.columns
 			WHERE
 				table_name='users' AND
@@ -1376,6 +1376,80 @@ var migrations = [...]func(tx *sql.Tx) error{
 	func(tx *sql.Tx) (err error) {
 		sql := `
 			ALTER TABLE integrations ADD COLUMN linkwarden_collection_id int;
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	// Lintile: Add tags and entry_tags tables for entry-level tagging
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			CREATE TABLE tags (
+				id SERIAL PRIMARY KEY,
+				user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				name TEXT NOT NULL,
+				created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+				UNIQUE (user_id, name)
+			);
+
+			CREATE INDEX tags_user_id_idx ON tags(user_id);
+
+			CREATE TYPE tag_source AS ENUM ('manual', 'auto');
+
+			CREATE TABLE entry_tags (
+				entry_id BIGINT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+				tag_id INT NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+				source tag_source NOT NULL DEFAULT 'manual',
+				created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+				PRIMARY KEY (entry_id, tag_id)
+			);
+
+			CREATE INDEX entry_tags_tag_id_idx ON entry_tags(tag_id);
+			CREATE INDEX entry_tags_entry_id_idx ON entry_tags(entry_id);
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	// Lintile: Add AI summary columns to entries table
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE entries
+				ADD COLUMN summary TEXT,
+				ADD COLUMN summarized_at TIMESTAMP WITH TIME ZONE;
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	// Lintile: Add embedding column and full_text_fetched_at for AI features
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			ALTER TABLE entries
+				ADD COLUMN embedding BYTEA,
+				ADD COLUMN full_text_fetched_at TIMESTAMP WITH TIME ZONE;
+		`
+		_, err = tx.Exec(sql)
+		return err
+	},
+	// Lintile: Add clusters and cluster_entries tables for entry clustering
+	func(tx *sql.Tx) (err error) {
+		sql := `
+			CREATE TABLE clusters (
+				id SERIAL PRIMARY KEY,
+				user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+				name TEXT NOT NULL,
+				created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+				expires_at TIMESTAMP WITH TIME ZONE
+			);
+
+			CREATE INDEX clusters_user_id_idx ON clusters(user_id);
+			CREATE INDEX clusters_expires_at_idx ON clusters(expires_at);
+
+			CREATE TABLE cluster_entries (
+				cluster_id INT NOT NULL REFERENCES clusters(id) ON DELETE CASCADE,
+				entry_id BIGINT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+				PRIMARY KEY (cluster_id, entry_id)
+			);
+
+			CREATE INDEX cluster_entries_entry_id_idx ON cluster_entries(entry_id);
 		`
 		_, err = tx.Exec(sql)
 		return err

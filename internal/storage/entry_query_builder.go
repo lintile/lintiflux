@@ -157,7 +157,7 @@ func (e *EntryQueryBuilder) WithStatuses(statuses []string) *EntryQueryBuilder {
 	return e
 }
 
-// WithTags filter by a list of entry tags.
+// WithTags filter by a list of entry tags (feed-level tags from feed).
 func (e *EntryQueryBuilder) WithTags(tags []string) *EntryQueryBuilder {
 	if len(tags) > 0 {
 		for _, cat := range tags {
@@ -165,6 +165,42 @@ func (e *EntryQueryBuilder) WithTags(tags []string) *EntryQueryBuilder {
 			e.args = append(e.args, cat)
 		}
 	}
+	return e
+}
+
+// WithEntryTagID filter by entry-level tag ID (from entry_tags table).
+func (e *EntryQueryBuilder) WithEntryTagID(tagID int64) *EntryQueryBuilder {
+	if tagID > 0 {
+		e.conditions = append(e.conditions, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM entry_tags et WHERE et.entry_id = e.id AND et.tag_id = $%d)",
+			len(e.args)+1,
+		))
+		e.args = append(e.args, tagID)
+	}
+	return e
+}
+
+// WithEntryTagIDs filter by multiple entry-level tag IDs.
+func (e *EntryQueryBuilder) WithEntryTagIDs(tagIDs []int64) *EntryQueryBuilder {
+	if len(tagIDs) > 0 {
+		e.conditions = append(e.conditions, fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM entry_tags et WHERE et.entry_id = e.id AND et.tag_id = ANY($%d))",
+			len(e.args)+1,
+		))
+		e.args = append(e.args, pq.Int64Array(tagIDs))
+	}
+	return e
+}
+
+// WithSummary filter entries that have a summary.
+func (e *EntryQueryBuilder) WithSummary() *EntryQueryBuilder {
+	e.conditions = append(e.conditions, "e.summary IS NOT NULL AND e.summary != ''")
+	return e
+}
+
+// WithoutSummary filter entries that don't have a summary.
+func (e *EntryQueryBuilder) WithoutSummary() *EntryQueryBuilder {
+	e.conditions = append(e.conditions, "e.summary IS NULL OR e.summary = ''")
 	return e
 }
 

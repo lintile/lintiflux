@@ -37,6 +37,13 @@ type Entry struct {
 	Enclosures  EnclosureList `json:"enclosures"`
 	Feed        *Feed         `json:"feed,omitempty"`
 	Tags        []string      `json:"tags"`
+
+	// AI-powered features (Lintile)
+	Summary           string     `json:"summary,omitempty"`
+	SummarizedAt      *time.Time `json:"summarized_at,omitempty"`
+	Embedding         []byte     `json:"-"` // Not exposed via API
+	FullTextFetchedAt *time.Time `json:"full_text_fetched_at,omitempty"`
+	EntryTags         EntryTags  `json:"entry_tags,omitempty"`
 }
 
 func NewEntry() *Entry {
